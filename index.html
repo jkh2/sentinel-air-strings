@@ -8,12 +8,15 @@
 *{box-sizing:border-box;margin:0}
 html,body{height:100%;background:#05080f;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#e8eefc;touch-action:none}
 canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
-#bar{position:fixed;top:10px;left:10px;right:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;z-index:5;pointer-events:none}
+#bar{position:fixed;top:10px;left:10px;right:100px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;z-index:5;pointer-events:none}
 #bar>*{pointer-events:auto}
 button,select{background:rgba(12,18,36,.78);color:#e8eefc;border:1px solid rgba(140,170,255,.4);border-radius:10px;padding:8px 12px;font-size:14px;backdrop-filter:blur(6px);cursor:pointer}
 button:hover,select:hover{border-color:#9fc0ff}
 #title{font-weight:700;letter-spacing:.06em;font-size:14px;padding:8px 12px;background:rgba(12,18,36,.78);border:1px solid rgba(140,170,255,.25);border-radius:10px;backdrop-filter:blur(6px)}
 #hint{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:5;font-size:13px;line-height:1.5;text-align:center;background:rgba(12,18,36,.72);border:1px solid rgba(140,170,255,.25);padding:8px 14px;border-radius:12px;backdrop-filter:blur(6px);max-width:min(560px,calc(100vw - 150px));pointer-events:none;transition:opacity .6s}
+#ui{position:fixed;top:10px;right:10px;z-index:6}
+body.noui #bar,body.noui #hint,body.noui #status{display:none}
+body.noui #ui{opacity:.4;padding:6px 12px}
 #status{position:fixed;top:58px;left:10px;z-index:5;font-size:12px;opacity:.8;pointer-events:none}
 #start{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px;background:radial-gradient(ellipse at 50% 30%,#12204a 0%,#05080f 70%)}
 #start h1{font-size:clamp(28px,6vw,52px);letter-spacing:.05em;background:linear-gradient(90deg,#7fd1ff,#c79bff,#ffd479);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -40,6 +43,7 @@ button:hover,select:hover{border-color:#9fc0ff}
   <button id="cam">Camera: on</button>
   <button id="skel">Skeleton: on</button>
 </div>
+<button id="ui">Hide menu</button>
 <div id="status"></div>
 <div id="hint">Pinch (thumb + index) in the air to drop a point. Two points make a string. Pinch near a point to drag it &mdash; closer = higher note. Strum with open fingers. Drag a point to the &#10005; to delete.</div>
 
@@ -130,6 +134,9 @@ $('clear').onclick=()=>{points.length=0;strings.length=0;hands.forEach(h=>h.grab
 $('undo').onclick=()=>{if(points.length) removePoint(points[points.length-1]);};
 $('cam').onclick=()=>{if(!camOn)return;showCam=!showCam;$('cam').textContent='Camera: '+(showCam?'on':'off');};
 $('skel').onclick=()=>{showSkel=!showSkel;$('skel').textContent='Skeleton: '+(showSkel?'on':'off');};
+function setUI(hide){document.body.classList.toggle('noui',hide);$('ui').textContent=hide?'\u2630':'Hide menu';}
+$('ui').onclick=()=>setUI(!document.body.classList.contains('noui'));
+addEventListener('keydown',e=>{if(e.key==='h'||e.key==='H')$('ui').click();});
 addEventListener('keydown',e=>{if(e.key==='c'||e.key==='C')$('clear').click();if(e.key==='z'||e.key==='Z')$('undo').click();});
 
 /* ---------- hands ---------- */
