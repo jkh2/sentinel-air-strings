@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Sentinel Air Strings</title>
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:#05080f;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#e8eefc;touch-action:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+#bar{position:fixed;top:10px;left:10px;right:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;z-index:5;pointer-events:none}
+#bar>*{pointer-events:auto}
+button,select{background:rgba(12,18,36,.78);color:#e8eefc;border:1px solid rgba(140,170,255,.4);border-radius:10px;padding:8px 12px;font-size:14px;backdrop-filter:blur(6px);cursor:pointer}
+button:hover,select:hover{border-color:#9fc0ff}
+#title{font-weight:700;letter-spacing:.06em;font-size:14px;padding:8px 12px;background:rgba(12,18,36,.78);border:1px solid rgba(140,170,255,.25);border-radius:10px;backdrop-filter:blur(6px)}
+#hint{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:5;font-size:13px;line-height:1.5;text-align:center;background:rgba(12,18,36,.72);border:1px solid rgba(140,170,255,.25);padding:8px 14px;border-radius:12px;backdrop-filter:blur(6px);max-width:min(560px,calc(100vw - 150px));pointer-events:none;transition:opacity .6s}
+#status{position:fixed;top:58px;left:10px;z-index:5;font-size:12px;opacity:.8;pointer-events:none}
+#start{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px;background:radial-gradient(ellipse at 50% 30%,#12204a 0%,#05080f 70%)}
+#start h1{font-size:clamp(28px,6vw,52px);letter-spacing:.05em;background:linear-gradient(90deg,#7fd1ff,#c79bff,#ffd479);-webkit-background-clip:text;background-clip:text;color:transparent}
+#start p{max-width:520px;opacity:.85;line-height:1.55;font-size:15px}
+#go{font-size:18px;padding:14px 30px;background:linear-gradient(90deg,#2a5bff,#8a3bff);border:none;border-radius:14px;font-weight:600}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<video id="v" playsinline muted style="display:none"></video>
+
+<div id="bar">
+  <div id="title">SENTINEL AIR STRINGS</div>
+  <button id="undo">Undo</button>
+  <button id="clear">Clear</button>
+  <select id="scale" title="Scale">
+    <option value="minpent">Minor pentatonic</option>
+    <option value="majpent">Major pentatonic</option>
+    <option value="major">Major</option>
+    <option value="blues">Blues</option>
+    <option value="free">Free (no snapping)</option>
+  </select>
+  <select id="key" title="Key"></select>
+  <button id="cam">Camera: on</button>
+  <button id="skel">Skeleton: on</button>
+</div>
+<div id="status"></div>
+<div id="hint">Pinch (thumb + index) in the air to drop a point. Two points make a string. Pinch near a point to drag it &mdash; closer = higher note. Strum with open fingers. Drag a point to the &#10005; to delete.</div>
+
+<div id="start">
+  <h1>AIR STRINGS</h1>
+  <p>Your camera becomes a mirror. Pinch to hang points in the air, stretch strings between them, and strum with your fingers. Short strings sing high, long strings go low. Nothing leaves your device.</p>
+  <button id="go">Start (allow camera)</button>
+  <p style="font-size:13px;opacity:.6">No camera? You can still play with a mouse: click to place and drag points, hover across a string to strum. Turn your sound up.</p>
+</div>
+
+<script type="module">
+const $=id=>document.getElementById(id);
+const cv=$('c'), ctx=cv.getContext('2d'), video=$('v');
+let W=0,H=0,dpr=1;
+function resize(){dpr=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);}
+addEventListener('resize',resize);resize();
+
+/* ---------- music ---------- */
+const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const SCALES={minpent:[0,3,5,7,10],majpent:[0,2,4,7,9],major:[0,2,4,5,7,9,11],blues:[0,3,5,6,7,10]};
+const keySel=$('key'), scaleSel=$('scale');
+NOTE_NAMES.forEach((n,i)=>{const o=document.createElement('option');o.value=i;o.textContent='Key: '+n;keySel.appendChild(o);});
+keySel.value=9;
+const mtof=m=>440*Math.pow(2,(m-69)/12);
+const noteName=m=>NOTE_NAMES[((Math.round(m)%12)+12)%12]+(Math.floor(Math.round(m)/12)-1);
+function pitchFor(len){
+  const minL=90, maxL=Math.max(320,W*0.75);
+  const n=Math.min(1,Math.max(0,(len-minL)/(maxL-minL)));
+  const base=36+parseInt(keySel.value,10);
+  const mode=scaleSel.value;
+  let midi;
+  if(mode==='free'){ midi=base+(1-n)*43; }
+  else{
+    const steps=SCALES[mode]; const total=steps.length*3+1;
+    const idx=Math.round((1-n)*(total-1));
+    midi=base+(base<45?12:0)+Math.floor(idx/steps.length)*12+steps[idx%steps.length];
+  }
+  return {midi, freq:mtof(midi)};
+}
+
+/* ---------- audio: Karplus-Strong plucked string ---------- */
+let actx=null, master=null;
+function initAudio(){
+  if(actx) return;
+  actx=new (window.AudioContext||window.webkitAudioContext)();
+  const comp=actx.createDynamicsCompressor();
+  master=actx.createGain(); master.gain.value=0.9;
+  const dly=actx.createDelay(1); dly.delayTime.value=0.27;
+  const fb=actx.createGain(); fb.gain.value=0.3;
+  const wet=actx.createGain(); wet.gain.value=0.2;
+  master.connect(comp); master.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(comp);
+  comp.connect(actx.destination);
+}
+function pluck(freq,vel){
+  if(!actx) return;
+  if(actx.state==='suspended') actx.resume();
+  const sr=actx.sampleRate;
+  const N=Math.max(2,Math.round(sr/freq-0.5));
+  const sr2=Math.min(96000,Math.max(8000,freq*(N+0.5))); // exact tuning trick: buffer rate makes period = freq
+  const dur=2.6, len=Math.floor(sr2*dur);
+  const buf=actx.createBuffer(1,len,sr2), out=buf.getChannelData(0);
+  const d=new Float32Array(N);
+  const bright=0.3+0.65*vel; let prev=0;
+  for(let i=0;i<N;i++){const nz=Math.random()*2-1; prev+=bright*(nz-prev); d[i]=prev;}
+  const g=0.9985; let idx=0;
+  for(let i=0;i<len;i++){
+    const a=d[idx], b=d[(idx+1)%N];
+    out[i]=a; d[idx]=g*0.5*(a+b); idx=(idx+1)%N;
+  }
+  const fade=Math.floor(sr2*0.4);
+  for(let i=0;i<fade;i++) out[len-1-i]*=i/fade;
+  const src=actx.createBufferSource(); src.buffer=buf;
+  const gn=actx.createGain(); gn.gain.value=0.5+0.6*vel;
+  src.connect(gn); gn.connect(master); src.start();
+}
+
+/* ---------- scene ---------- */
+const points=[], strings=[];
+let showCam=true, camOn=false, landmarker=null;
+const hasString=p=>strings.some(s=>s.a===p||s.b===p);
+const trashPos=()=>({x:W-70,y:H-90,r:42});
+const inTrash=p=>{const t=trashPos();return Math.hypot(p.x-t.x,p.y-t.y)<t.r+8;};
+function removePoint(p){
+  const i=points.indexOf(p); if(i>=0) points.splice(i,1);
+  for(let k=strings.length-1;k>=0;k--) if(strings[k].a===p||strings[k].b===p) strings.splice(k,1);
+}
+$('clear').onclick=()=>{points.length=0;strings.length=0;hands.forEach(h=>h.grabbed=null);};
+$('undo').onclick=()=>{if(points.length) removePoint(points[points.length-1]);};
+$('cam').onclick=()=>{showCam=!showCam;$('cam').textContent='Camera: '+(showCam?'on':'off');};
+$('skel').onclick=()=>{showSkel=!showSkel;$('skel').textContent='Skeleton: '+(showSkel?'on':'off');};
+addEventListener('keydown',e=>{if(e.key==='c'||e.key==='C')$('clear').click();if(e.key==='z'||e.key==='Z')$('undo').click();});
+
+/* ---------- hands ---------- */
+let hands=[]; // camera hands
+const mouse={mouse:true,pos:{x:0,y:0},tips:[],pinching:false,was:false,grabbed:null,prevTips:null,active:false};
+const mkHand=()=>({pos:{x:0,y:0},wrist:{x:0,y:0},size:100,tips:[],pts:null,pinching:false,was:false,grabbed:null,prevTips:null});
+
+function nearestPoint(pos,r,h){
+  let best=null,bd=r;
+  for(const p of points){
+    if(p.owner&&p.owner!==h) continue;
+    const d=Math.hypot(p.x-pos.x,p.y-pos.y);
+    if(d<bd){bd=d;best=p;}
+  }
+  return best;
+}
+function onPinchStart(h){
+  let p=nearestPoint(h.pos,70,h);
+  if(!p){
+    if(points.length>=24) return;
+    p={x:h.pos.x,y:h.pos.y,owner:null};
+    const un=points.slice().reverse().find(q=>!hasString(q));
+    points.push(p);
+    if(un) strings.push({a:un,b:p,amp:0,phase:0,last:0,midi:57,freq:220});
+  }
+  h.grabbed=p; p.owner=h;
+}
+function onRelease(h){
+  const p=h.grabbed; if(!p) return;
+  p.owner=null; h.grabbed=null;
+  if(inTrash(p)) removePoint(p);
+}
+function applyPinch(h){
+  if(h.pinching&&!h.was) onPinchStart(h);
+  if(!h.pinching&&h.was) onRelease(h);
+  if(h.pinching&&h.grabbed){
+    h.grabbed.x=Math.min(W-4,Math.max(4,h.pos.x));
+    h.grabbed.y=Math.min(H-4,Math.max(4,h.pos.y));
+  }
+  h.was=h.pinching;
+}
+function segInt(p1,p2,p3,p4){
+  const ccw=(a,b,c)=>(c.y-a.y)*(b.x-a.x)>(b.y-a.y)*(c.x-a.x);
+  return ccw(p1,p3,p4)!==ccw(p2,p3,p4)&&ccw(p1,p2,p3)!==ccw(p1,p2,p4);
+}
+function trigger(s,vel,pt){
+  const pc=pitchFor(Math.hypot(s.a.x-s.b.x,s.a.y-s.b.y));
+  s.midi=pc.midi; s.freq=pc.freq;
+  s.amp=8+16*vel; s.pulse=1;
+  pluck(pc.freq,vel);
+  if(pt) spark(pt.x,pt.y,vel,s);
+}
+function strum(h,now,dt){
+  if(h.pinching||!h.tips.length){h.prevTips=null;return;}
+  if(h.prevTips){
+    h.tips.forEach((t,i)=>{
+      const p=h.prevTips[i]; if(!p) return;
+      const mv=Math.hypot(t.x-p.x,t.y-p.y); if(mv<5) return;
+      for(const s of strings){
+        if(now-s.last<90) continue;
+        if(segInt(p,t,s.a,s.b)){
+          const speed=mv/Math.max(dt,0.008);
+          trigger(s,Math.min(1,Math.max(0.25,speed/1800)),t);
+          s.last=now;
+        }
+      }
+    });
+  }
+  h.prevTips=h.tips.map(t=>({x:t.x,y:t.y}));
+}
+
+function mapLM(l){
+  const vw=video.videoWidth,vh=video.videoHeight;
+  const s=Math.max(W/vw,H/vh), ox=(W-vw*s)/2, oy=(H-vh*s)/2;
+  return {x:W-(ox+l.x*vw*s), y:oy+l.y*vh*s};
+}
+function updateHands(dets,now,dt){
+  const used=new Set();
+  for(const lms of dets){
+    const pts=lms.map(mapLM), wrist=pts[0];
+    let best=null,bd=200;
+    for(const h of hands){
+      if(used.has(h)) continue;
+      const d=Math.hypot(h.wrist.x-wrist.x,h.wrist.y-wrist.y);
+      if(d<bd){bd=d;best=h;}
+    }
+    const h=best||mkHand(); used.add(h);
+    h.wrist=wrist; h.pts=pts;
+    h.size=Math.hypot(pts[0].x-pts[9].x,pts[0].y-pts[9].y);
+    const ratio=Math.hypot(pts[4].x-pts[8].x,pts[4].y-pts[8].y)/Math.max(h.size,1);
+    if(!h.pinching&&ratio<0.3) h.pinching=true;
+    else if(h.pinching&&ratio>0.5) h.pinching=false;
+    const np={x:(pts[4].x+pts[8].x)/2,y:(pts[4].y+pts[8].y)/2};
+    h.pos=h.was?{x:h.pos.x+(np.x-h.pos.x)*0.65,y:h.pos.y+(np.y-h.pos.y)*0.65}:np;
+    h.tips=[pts[8],pts[12],pts[16],pts[20]];
+    applyPinch(h);
+    strum(h,now,dt);
+  }
+  for(const h of hands){ if(!used.has(h)) onRelease(h); }
+  hands=[...used];
+}
+
+cv.addEventListener('pointermove',e=>{mouse.pos={x:e.clientX,y:e.clientY};mouse.active=true;});
+cv.addEventListener('pointerdown',e=>{mouse.pos={x:e.clientX,y:e.clientY};mouse.active=true;mouse.pinching=true;});
+const mup=()=>{mouse.pinching=false;};
+cv.addEventListener('pointerup',mup);cv.addEventListener('pointercancel',mup);cv.addEventListener('pointerleave',mup);
+
+const sparks=[];
+function spark(x,y,vel,s){
+  const hue=((Math.round(s.midi)%12)/12)*360;
+  const n=10+Math.floor(16*vel);
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, sp=40+Math.random()*240*vel;
+    sparks.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-30,life:0,max:0.5+Math.random()*0.8,hue});
+  }
+  if(sparks.length>450) sparks.splice(0,sparks.length-450);
+}
+const HAND_CONN=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+let showSkel=true;
+/* ---------- drawing ---------- */
+function drawScene(dt,now){
+  ctx.clearRect(0,0,W,H);
+  if(showCam&&camOn&&video.videoWidth){
+    const vw=video.videoWidth,vh=video.videoHeight,s=Math.max(W/vw,H/vh),ox=(W-vw*s)/2,oy=(H-vh*s)/2;
+    ctx.save();ctx.translate(W,0);ctx.scale(-1,1);ctx.drawImage(video,ox,oy,vw*s,vh*s);ctx.restore();
+    ctx.fillStyle='rgba(4,8,18,.18)';ctx.fillRect(0,0,W,H);
+  }else{
+    const g=ctx.createRadialGradient(W/2,H/2,50,W/2,H/2,Math.max(W,H)*0.7);
+    g.addColorStop(0,'#10193a');g.addColorStop(1,'#04060d');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  }
+
+  // trash
+  const t=trashPos();
+  const hot=points.some(p=>p.owner&&inTrash(p));
+  ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,7);
+  ctx.fillStyle=hot?'rgba(255,70,70,.55)':'rgba(10,14,28,.55)';ctx.fill();
+  ctx.lineWidth=2;ctx.strokeStyle=hot?'#ff6b6b':'rgba(200,215,255,.5)';ctx.stroke();
+  ctx.fillStyle='#fff';ctx.font='700 26px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('\u2715',t.x,t.y+1);
+
+  // strings
+  for(const s of strings){
+    const dx=s.b.x-s.a.x, dy=s.b.y-s.a.y, len=Math.hypot(dx,dy)||1;
+    const nx=-dy/len, ny=dx/len;
+    const pc=pitchFor(len); s.midi=pc.midi; s.freq=pc.freq;
+    s.amp*=Math.exp(-dt*2.4); s.phase+=dt*70; s.pulse=(s.pulse||0)*Math.exp(-dt*4);
+    const hue=((Math.round(s.midi)%12)/12)*360;
+    const col=`hsl(${hue},95%,68%)`;
+    ctx.save();
+    ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.shadowColor=col;ctx.shadowBlur=10+s.amp*1.5+s.pulse*16;
+    ctx.strokeStyle=col;ctx.lineWidth=2.5+s.pulse*2.5;
+    ctx.beginPath();
+    const steps=40;
+    for(let i=0;i<=steps;i++){
+      const u=i/steps, off=s.amp*(Math.sin(Math.PI*u)*Math.cos(s.phase)+0.4*Math.sin(2*Math.PI*u)*Math.cos(s.phase*2.03+1)+0.18*Math.sin(3*Math.PI*u)*Math.cos(s.phase*3.1+2));
+      const x=s.a.x+dx*u+nx*off, y=s.a.y+dy*u+ny*off;
+      i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+    }
+    ctx.stroke();
+    ctx.restore();
+    ctx.save();ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=1;
+    const tk=Math.max(4,Math.floor(len/22));
+    for(let k=1;k<tk;k++){
+      const u=k/tk, off=s.amp*Math.sin(Math.PI*u)*Math.cos(s.phase);
+      const x=s.a.x+dx*u+nx*off, y=s.a.y+dy*u+ny*off, hh=(k%4===0)?9:5;
+      ctx.beginPath();ctx.moveTo(x-nx*hh,y-ny*hh);ctx.lineTo(x+nx*hh,y+ny*hh);ctx.stroke();
+    }
+    ctx.restore();
+    // note label
+    const mx=(s.a.x+s.b.x)/2+nx*-22, my=(s.a.y+s.b.y)/2+ny*-22;
+    ctx.font='600 13px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='rgba(8,12,24,.65)';
+    const label=noteName(s.midi), tw=ctx.measureText(label).width+14;
+    ctx.beginPath();ctx.roundRect(mx-tw/2,my-11,tw,22,8);ctx.fill();
+    ctx.fillStyle=col;ctx.fillText(label,mx,my+1);
+  }
+
+  // sparks
+  for(let i=sparks.length-1;i>=0;i--){
+    const q=sparks[i]; q.life+=dt;
+    if(q.life>q.max){sparks.splice(i,1);continue;}
+    q.x+=q.vx*dt;q.y+=q.vy*dt;q.vx*=0.96;q.vy=q.vy*0.96+30*dt;
+    ctx.strokeStyle=`hsla(${q.hue},100%,82%,${1-q.life/q.max})`;ctx.lineWidth=1.8;
+    ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(q.x-q.vx*0.035,q.y-q.vy*0.035);ctx.stroke();
+  }
+
+  // points
+  for(const p of points){
+    const paired=hasString(p), grabbed=!!p.owner;
+    const pulse=1+0.15*Math.sin(now/220);
+    ctx.save();
+    ctx.shadowColor='#fff';ctx.shadowBlur=grabbed?20:10;
+    ctx.beginPath();ctx.arc(p.x,p.y,(grabbed?13:9)*(paired?1:pulse),0,7);
+    if(paired){ctx.fillStyle=grabbed?'#fff':'rgba(232,240,255,.25)';ctx.fill();ctx.lineWidth=2.5;ctx.strokeStyle='#fff';ctx.stroke();}
+    else{ctx.lineWidth=3;ctx.strokeStyle='#ffd479';ctx.stroke();}
+    ctx.restore();
+    if(!paired){
+      ctx.font='12px system-ui';ctx.textAlign='center';ctx.fillStyle='#ffd479';
+      ctx.fillText('pinch a 2nd point',p.x,p.y-24);
+    }
+  }
+
+  // hands
+  const all=hands.concat(mouse.active?[mouse]:[]);
+  for(const h of all){
+    if(h.pts){
+      if(showSkel){
+        ctx.save();ctx.lineWidth=3;ctx.strokeStyle='#2fdc4a';ctx.lineCap='round';
+        for(const [a,b] of HAND_CONN){ctx.beginPath();ctx.moveTo(h.pts[a].x,h.pts[a].y);ctx.lineTo(h.pts[b].x,h.pts[b].y);ctx.stroke();}
+        ctx.fillStyle='#e02020';
+        for(const q of h.pts){ctx.beginPath();ctx.arc(q.x,q.y,4.5,0,7);ctx.fill();}
+        ctx.restore();
+      }else{
+        ctx.fillStyle='rgba(255,255,255,.75)';
+        for(const i of [4,8,12,16,20]){ctx.beginPath();ctx.arc(h.pts[i].x,h.pts[i].y,4,0,7);ctx.fill();}
+      }
+    }
+    ctx.beginPath();ctx.arc(h.pos.x,h.pos.y,h.pinching?10:16,0,7);
+    ctx.lineWidth=3;ctx.strokeStyle=h.pinching?'#7fffb0':'rgba(255,255,255,.8)';
+    if(h.pinching){ctx.fillStyle='rgba(127,255,176,.35)';ctx.fill();}
+    ctx.stroke();
+  }
+}
+
+/* ---------- main loop ---------- */
+let lastFrame=performance.now(), lastVideoTime=-1, lastDet=performance.now();
+function frame(now){
+  const dt=Math.min(0.05,(now-lastFrame)/1000); lastFrame=now;
+  if(landmarker&&camOn&&video.readyState>=2&&video.currentTime!==lastVideoTime){
+    lastVideoTime=video.currentTime;
+    let res=null;
+    try{res=landmarker.detectForVideo(video,now);}catch(e){}
+    const ddt=Math.max(0.008,(now-lastDet)/1000); lastDet=now;
+    if(res) updateHands(res.landmarks||[],now,ddt);
+  }
+  if(mouse.active){
+    mouse.tips=[mouse.pos];
+    mouse.pos={...mouse.pos};
+    applyPinch(mouse);
+    strum(mouse,now,dt);
+  }
+  drawScene(dt,now);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- start ---------- */
+const status=m=>$('status').textContent=m;
+$('go').onclick=async()=>{
+  initAudio();
+  $('start').style.display='none';
+  status('Starting camera…');
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});
+    video.srcObject=stream; await video.play(); camOn=true;
+  }catch(e){
+    status('Camera unavailable — mouse mode (click, drag, hover to strum).');
+    return;
+  }
+  status('Loading hand tracking…');
+  try{
+    const mp=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm');
+    const fileset=await mp.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    const modelAssetPath='https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+    const opts=d=>({baseOptions:{modelAssetPath,delegate:d},runningMode:'VIDEO',numHands:4,minHandDetectionConfidence:.5,minHandPresenceConfidence:.5,minTrackingConfidence:.5});
+    try{landmarker=await mp.HandLandmarker.createFromOptions(fileset,opts('GPU'));}
+    catch(e){landmarker=await mp.HandLandmarker.createFromOptions(fileset,opts('CPU'));}
+    status('Hands ready — pinch to place a point.');
+    setTimeout(()=>status(''),4000);
+    setTimeout(()=>{$('hint').style.opacity=.35;},15000);
+  }catch(e){
+    status('Hand tracking failed to load — mouse mode still works.');
+  }
+};
+</script>
+</body>
+</html>
