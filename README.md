@@ -28,7 +28,9 @@ Your camera shows you as a mirror image. On top of that live view, the app draws
 | **Pinch detection** | A pinch is the distance between thumb tip and index tip, measured relative to the size of your hand, with hysteresis so it does not flicker. |
 | **Strumming** | Each frame, the app checks whether a fingertip's path crossed a string. Faster crossings play louder. |
 | **Pitch** | A string's pitch comes from its on-screen length. Shorter is higher, longer is lower. Pitch updates live as you drag a point. |
-| **Sound** | Each pluck is synthesized with the Karplus-Strong plucked-string algorithm using the Web Audio API, with a touch of echo. No audio files are used. |
+| **Pitch bend** | If you move a point while its string is still ringing, the note slides with it, like bending a guitar string. |
+| **Sound** | Each pluck is synthesized with the Karplus-Strong plucked-string algorithm using the Web Audio API. No audio files are used. |
+| **Effects** | A built-in pedalboard (drive, wah, tremolo, chorus, flanger, echo, reverb, octave) processes everything you play, all in real time in the browser. |
 | **Visuals** | Canvas 2D: glowing strings with overtone wobble, tick marks, spark particles on every pluck, and a hand skeleton overlay. |
 
 The camera image is processed on your device. Nothing from your video is uploaded anywhere. (The hand-tracking library and model are downloaded from public CDNs when the app loads, so you need an internet connection.)
@@ -42,7 +44,8 @@ The camera image is processed on your device. Nothing from your video is uploade
 5. **Retune a string:** Pinch near a point to grab it, then drag. Bring the points closer for a higher note, or pull them apart for a lower one. The note name is shown on each string.
 6. **Strum:** Keep your fingers open and sweep them across a string. Strum fast for loud, glowing plucks.
 7. **Delete a point:** Drag it to the ✕ in the bottom-right corner and release. Its string goes with it.
-8. Add as many strings as you like, up to 24 points. Each string plays independently, and they can cross.
+8. **Bend a note:** While a string is still ringing, drag one of its points. The pitch slides as you move. Bending up uses up the note faster, so a big bend ends it sooner.
+9. Add as many strings as you like, up to 24 points. Each string plays independently, and they can cross.
 
 ### Controls
 
@@ -54,7 +57,25 @@ The camera image is processed on your device. Nothing from your video is uploade
 | **Key** | Sets the root note of the scale. |
 | **Camera** | Turns the camera image on or off. The instrument keeps working over a plain background. |
 | **Skeleton** | Shows or hides the green hand skeleton overlay. |
+| **FX** (or `F`) | Opens the pedalboard (see below). |
 | **Hide menu** (or `H`) | Hides all the buttons and the instruction box for a clean, full-screen view. Tap the small ☰ in the top-right corner to bring them back. |
+
+### Effects pedalboard
+
+Tap **FX** to open eight pedals. Tap a pedal's name to switch it on (its light turns green), and use its slider to set how much. Your settings are remembered on that device. Echo starts on at a low level, and everything else starts off.
+
+| Pedal | What it does | Slider |
+|---|---|---|
+| **Drive** | Distortion that turns the strings into a crunchy electric guitar. | How hard it saturates |
+| **Wah** | A resonant filter that sweeps up and down, like a wah pedal. Raise your left hand to open it and lower it to close it. With fewer than two hands in view, it sweeps by itself ("WAH auto"). | Resonance |
+| **Tremolo** | The volume pulses. | Depth |
+| **Chorus** | Two slowly wobbling copies thicken the sound. | Mix |
+| **Flanger** | A swept "jet plane" whoosh. | Mix |
+| **Echo** | Repeating, darkening delays. | Mix |
+| **Reverb** | Adds the sound of a room. | Mix |
+| **Octave** | Adds a quieter copy of each pluck one octave up. | Mix |
+
+The pedals are level-matched so switching one on does not suddenly make everything louder. Opening the pedalboard hides the instruction box and moves the ✕ up so nothing is covered, and **Hide menu** hides the pedalboard too (your effects stay on).
 
 ### No camera? Use a mouse
 
