@@ -1,6 +1,6 @@
 # Sentinel Air Strings: Roadmap
 
-Plan drafted Nov 23, 2026. Order is a suggestion, not a promise. Reorder freely after testing.
+Plan drafted Nov 23, 2026. Updated Nov 24, 2026. Order is a suggestion, not a promise. Reorder freely after testing.
 
 ## Done so far
 
@@ -12,6 +12,9 @@ Plan drafted Nov 23, 2026. Order is a suggestion, not a promise. Reorder freely 
 - Clear camera error messages
 - Hide menu button for a bigger playing area on phones
 - README with demo link and screenshot
+- Pitch bend: move a point while its string rings and the note slides with it (Nov 24)
+- Effects pedalboard with drive, wah, tremolo, chorus, flanger, echo, reverb, and octave (Nov 24)
+- Fixed a tuning error that made notes sharp, up to about half a semitone on high notes (Nov 24)
 
 ## Before anything new
 
@@ -23,7 +26,7 @@ Plan drafted Nov 23, 2026. Order is a suggestion, not a promise. Reorder freely 
 
 Small changes that make the instrument nicer to use right away.
 
-1. **Pitch bend.** Drag a point while its string is still ringing and the note slides with it. Idea: change the playback speed of the sound that is already playing, so it bends smoothly.
+1. ~~**Pitch bend.**~~ Done Nov 24. Dragging a point while its string rings slides the note.
 2. **Camera picker.** A dropdown to choose between cameras (GoPro, webcam, phone front and back). Needed for the GoPro test.
 3. **Vibration on pluck.** A short buzz on phones that support it (many Android phones; iPhones do not allow it).
 4. **Phone sizing.** Larger points and pinch targets on small screens, since the phone view felt cramped.
@@ -38,7 +41,10 @@ These work best when built together, because the looper and backing beat depend 
 
 ## Phase 3: New sounds
 
-8. **Effects pedals.** A small pedalboard of toggles, each lighting up when on:
+8. ~~**Effects pedals.**~~ Done Nov 24 (drive, wah, tremolo, chorus, flanger, echo, reverb, octave). Ideas to extend it:
+   - A delay-time control for Echo, and tempo sync once there is a backing beat
+   - Per-string effects, so one string can be distorted while another stays clean
+   - Original list, for reference:
    - Distortion / overdrive
    - Echo and reverb
    - Chorus / flanger
@@ -69,7 +75,9 @@ These work best when built together, because the looper and backing beat depend 
 ## Open questions
 
 - How should the app switch between strings and drum pads: a mode button or a gesture?
-- Which pedals matter most?
+- Which pedals do you actually use? Cut or rework the rest.
+- Does the pitch bend feel right? It follows the same pitch-by-length rule as retuning, so it can be sensitive on a small phone screen. A gentler bend setting is easy to add.
+- Does the air wah feel good with two hands tracked?
 - Should saved layouts stay on the device only, or be shareable by link?
 
 ## Notes
