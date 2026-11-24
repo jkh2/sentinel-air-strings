@@ -128,7 +128,7 @@ function removePoint(p){
 }
 $('clear').onclick=()=>{points.length=0;strings.length=0;hands.forEach(h=>h.grabbed=null);};
 $('undo').onclick=()=>{if(points.length) removePoint(points[points.length-1]);};
-$('cam').onclick=()=>{showCam=!showCam;$('cam').textContent='Camera: '+(showCam?'on':'off');};
+$('cam').onclick=()=>{if(!camOn)return;showCam=!showCam;$('cam').textContent='Camera: '+(showCam?'on':'off');};
 $('skel').onclick=()=>{showSkel=!showSkel;$('skel').textContent='Skeleton: '+(showSkel?'on':'off');};
 addEventListener('keydown',e=>{if(e.key==='c'||e.key==='C')$('clear').click();if(e.key==='z'||e.key==='Z')$('undo').click();});
 
@@ -378,16 +378,30 @@ function frame(now){
 requestAnimationFrame(frame);
 
 /* ---------- start ---------- */
-const status=m=>$('status').textContent=m;
+let stTimer=null;
+const status=(m,ms)=>{$('status').textContent=m;clearTimeout(stTimer);if(ms)stTimer=setTimeout(()=>{$('status').textContent='';},ms);};
+function noCamera(msg){
+  status(msg,12000);
+  const b=$('cam'); b.textContent='Camera: none'; b.disabled=true; b.style.opacity=.5; b.style.cursor='default';
+  $('skel').style.display='none';
+}
 $('go').onclick=async()=>{
   initAudio();
   $('start').style.display='none';
   status('Starting camera…');
   try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw Object.assign(new Error('insecure'),{name:'InsecureContext'});
     const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});
     video.srcObject=stream; await video.play(); camOn=true;
   }catch(e){
-    status('Camera unavailable — mouse mode (click, drag, hover to strum).');
+    const tail=' Mouse mode works meanwhile: click, drag, hover to strum.';
+    const msgs={
+      NotAllowedError:'Camera blocked. Allow camera access for this site (lock icon in the address bar), then reload.'+tail,
+      NotFoundError:'No camera found.'+tail,
+      NotReadableError:'Camera is in use by another app. Close it, then reload.'+tail,
+      InsecureContext:'The camera needs an https page or localhost.'+tail
+    };
+    noCamera(msgs[e.name]||('Camera unavailable.'+tail));
     return;
   }
   status('Loading hand tracking…');
@@ -402,7 +416,7 @@ $('go').onclick=async()=>{
     setTimeout(()=>status(''),4000);
     setTimeout(()=>{$('hint').style.opacity=.35;},15000);
   }catch(e){
-    status('Hand tracking failed to load — mouse mode still works.');
+    status('Hand tracking failed to load. Check your connection and reload. Mouse mode still works.',15000);
   }
 };
 </script>
