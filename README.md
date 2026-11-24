@@ -92,4 +92,4 @@ Browsers only allow camera access on https pages or localhost, so opening the fi
 
 ## About
 
-Part of the Sentinel family of projects by James Keith Harwood II, [Sentinel AI Systems](https://www.jameskeithharwood.com). It grew out of the camera and body-tracking ideas in Sentinel Spotter.
+Part of the Sentinel family of projects by James Keith Harwood II, [Sentinel AI Systems](https://www.jameskeithharwood.com). It grew out of the camera and body-tracking ideas in Sentinel Spotter, but was inspired by SonicDeadHorse post on X: https://x.com/SonicDeadhorse/status/2124783575132430348?a=CFpreFmSxVJvQK40TvE&s=20
