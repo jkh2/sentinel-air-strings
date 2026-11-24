@@ -4,7 +4,7 @@
 
 Sentinel Air Strings turns your webcam into an augmented-reality instrument. You pinch to hang points in the air, stretch glowing strings between them, and strum those strings with your fingers. Short strings sing high, long strings go low. It runs entirely in the browser: one HTML file, no install, no account.
 
-### ▶ [Try the live demo](https://jkh2.github.io/sentinel-air-strings/)
+### ▶ [Try the live demo](https://jameskeithharwood.com/sentinel-air-strings/)
 
 Works in a desktop or phone browser. Allow camera access, turn your sound up, and start pinching.
 
@@ -54,6 +54,7 @@ The camera image is processed on your device. Nothing from your video is uploade
 | **Key** | Sets the root note of the scale. |
 | **Camera** | Turns the camera image on or off. The instrument keeps working over a plain background. |
 | **Skeleton** | Shows or hides the green hand skeleton overlay. |
+| **Hide menu** (or `H`) | Hides all the buttons and the instruction box for a clean, full-screen view. Tap the small ☰ in the top-right corner to bring them back. |
 
 ### No camera? Use a mouse
 
