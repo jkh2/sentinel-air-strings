@@ -144,4 +144,8 @@ Browsers only allow camera access on https pages or localhost, so opening the fi
 
 ## About
 
-Part of the Sentinel family of projects by James Keith Harwood II, [Sentinel AI Systems](https://www.jameskeithharwood.com). It grew out of the camera and body-tracking ideas in Sentinel Spotter, but was further inspired by SonicDeadHorse post on X: https://x.com/SonicDeadhorse/status/2124783575132430348?a=CFpreFmSxVJvQK40TvE&s=20  (built without seeing Sonicdeadhorse code, and without a link to his air strings project demo.  We were inspired by only what we saw in the video.
+Part of the Sentinel family of projects by James Keith Harwood II, [Sentinel AI Systems](https://www.jameskeithharwood.com). It grew out of the camera and body-tracking ideas in Sentinel Spotter, but was further inspired by SonicDeadHorse post on X: https://x.com/SonicDeadhorse/status/2124783575132430348?a=CFpreFmSxVJvQK40TvE&s=20 (built without seeing Sonicdeadhorse code, and without a link to his air strings project demo. We were inspired by only what we saw in the video.
+
+### Made together
+
+Sentinel Air Strings was created by James Keith Harwood II in partnership with Claude, an AI made by [Anthropic](https://www.anthropic.com). James brought the idea and the vision for how it should look and feel, made the design decisions, and tested every version with real hands, phones, and webcams. Claude wrote the code and the sound engine, tested each build, and worked through the ideas with him along the way.
