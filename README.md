@@ -59,6 +59,7 @@ The camera image is processed on your device. Nothing from your video is uploade
 | **Camera picker** | Appears when you have more than one camera (a webcam, DroidCam, a GoPro, a phone's front and back cameras). Your choice is remembered. A rear camera is shown unmirrored. |
 | **Skeleton** | Shows or hides the green hand skeleton overlay. |
 | **FX** (or `F`) | Opens the pedalboard (see below). |
+| **Music** (or `M`) | Opens the beat, looper, and layouts panel (see below). `B` starts or stops the beat, `L` starts a loop take. |
 | **● Rec** (or `R`) | Records a clip of your playing with its sound (see below). Stays on screen even with the menu hidden. |
 | **Haptics** | Phones only: a short buzz on each pluck. Works on many Android phones; iPhones do not allow it. |
 | **Hide menu** (or `H`) | Hides all the buttons and the instruction box for a clean, full-screen view. Tap the small ☰ in the top-right corner to bring them back. |
@@ -79,6 +80,23 @@ Tap **FX** to open eight pedals. Tap a pedal's name to switch it on (its light t
 | **Octave** | Adds a quieter copy of each pluck one octave up. | Mix |
 
 The pedals are level-matched so switching one on does not suddenly make everything louder. Opening the pedalboard hides the instruction box and moves the ✕ up so nothing is covered, and **Hide menu** hides the pedalboard too (your effects stay on).
+
+### Beat, looper, and layouts
+
+Tap **Music** to open three sections. Your beat settings are remembered on the device.
+
+**Beat.** Tap **▶ Beat** to start a drum beat to play along with. Choose **Rock**, **Hip-hop** (with a little swing), **Dance**, or **Click** (a plain metronome). Set the tempo (60 to 180 BPM) and the beat volume. The four dots show where you are in the bar, with beat one in green. The drums are synthesized, and they are timed by the audio clock rather than the screen, so they stay steady even when hand tracking is busy.
+
+**Looper.** Works like a guitar loop pedal:
+
+1. Pick a loop length (1, 2, or 4 bars) and tap **● Loop**. Recording starts on the next bar. If the beat was off, it starts and gives you one bar to get ready. The status line counts you in.
+2. Play. When the loop length is up, what you played starts repeating, exactly in time with the beat.
+3. Tap **● Loop** again to add a layer on top. Each layer records one full pass of the loop. You can stack up to six.
+4. **Undo layer** removes the last layer, and **Clear loop** removes them all. Tapping **■ Cancel** while it is counting in or recording throws that take away.
+
+The looper records the strings exactly as you heard them, effects and pitch bends included. It does not record the drums or earlier layers, so they never double up. Notes still ringing at the end of a loop are cut off where the loop repeats. While a loop exists, the tempo and loop length are locked, because the loop was recorded at that speed. Clear the loop to change them. Loops and the beat are included when you record a clip.
+
+**Layouts.** **Save layout** stores your current strings, plus the scale and key, under a name you choose. Pick one from the list and tap **Load** to bring it back, or **Delete** to remove it. Layouts are kept on this device only. They are saved relative to the screen size, so on a different screen the strings land in the same places proportionally, and their notes may shift a little.
 
 ### Recording a clip
 
@@ -112,6 +130,7 @@ Browsers only allow camera access on https pages or localhost, so opening the fi
 ## Troubleshooting
 
 - **"Camera unavailable":** Check your browser's camera permission for the site, and make sure no other app is using the camera.
+- **A camera shows a solid green picture:** some virtual webcam drivers, such as the GoPro webcam app, send green when asked for a picture size they do not support. The app spots this and automatically tries other sizes. If it still shows green, set the camera to 1080p in its own app, restart that app, and pick the camera again. Regular webcams and phone cameras are not affected.
 - **"Hand tracking failed to load":** The tracking library could not be downloaded. Check your connection and reload. Mouse mode still works.
 - **No sound:** Start the app with the Start button (browsers require a tap before playing audio) and check your volume.
 - **Choppy tracking:** Close other heavy tabs and apps. A phone or laptop with a modern GPU will track more smoothly.
@@ -125,4 +144,4 @@ Browsers only allow camera access on https pages or localhost, so opening the fi
 
 ## About
 
-Part of the Sentinel family of projects by James Keith Harwood II, [Sentinel AI Systems](https://www.jameskeithharwood.com). It grew out of the camera and body-tracking ideas in Sentinel Spotter, but was inspired by SonicDeadHorse post on X: https://x.com/SonicDeadhorse/status/2124783575132430348?a=CFpreFmSxVJvQK40TvE&s=20
+Part of the Sentinel family of projects by James Keith Harwood II, [Sentinel AI Systems](https://www.jameskeithharwood.com). It grew out of the camera and body-tracking ideas in Sentinel Spotter, but was further inspired by SonicDeadHorse post on X: https://x.com/SonicDeadhorse/status/2124783575132430348?a=CFpreFmSxVJvQK40TvE&s=20  (built without seeing Sonicdeadhorse code, and without a link to his air strings project demo.  We were inspired by only what we saw in the video.
