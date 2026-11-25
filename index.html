@@ -10,11 +10,25 @@ html,body{height:100%;background:#05080f;overflow:hidden;font-family:system-ui,-
 canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 #bar{position:fixed;top:10px;left:10px;right:100px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;z-index:5;pointer-events:none}
 #bar>*{pointer-events:auto}
-button,select{background:rgba(12,18,36,.78);color:#e8eefc;border:1px solid rgba(140,170,255,.4);border-radius:10px;padding:8px 12px;font-size:14px;backdrop-filter:blur(6px);cursor:pointer}
-button:hover,select:hover{border-color:#9fc0ff}
+button,select,a.btn{background:rgba(12,18,36,.78);color:#e8eefc;border:1px solid rgba(140,170,255,.4);border-radius:10px;padding:8px 12px;font-size:14px;backdrop-filter:blur(6px);cursor:pointer}
+button:hover,select:hover,a.btn:hover{border-color:#9fc0ff}
+a.btn{display:inline-block;text-decoration:none}
+#camsel{max-width:150px;text-overflow:ellipsis}
 #title{font-weight:700;letter-spacing:.06em;font-size:14px;padding:8px 12px;background:rgba(12,18,36,.78);border:1px solid rgba(140,170,255,.25);border-radius:10px;backdrop-filter:blur(6px)}
 #hint{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:5;font-size:13px;line-height:1.5;text-align:center;background:rgba(12,18,36,.72);border:1px solid rgba(140,170,255,.25);padding:8px 14px;border-radius:12px;backdrop-filter:blur(6px);max-width:min(560px,calc(100vw - 150px));pointer-events:none;transition:opacity .6s}
 #ui{position:fixed;top:10px;right:10px;z-index:6}
+#rec{position:fixed;top:56px;right:10px;z-index:6}
+#rec.on{background:rgba(190,30,30,.88);border-color:#ff8a8a;animation:recpulse 1.2s infinite}
+@keyframes recpulse{50%{opacity:.7}}
+body.noui #rec:not(.on){opacity:.5}
+#clip{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(3,6,14,.85);padding:16px}
+#clip.show{display:flex}
+#clip .card{background:#0c1224;border:1px solid rgba(140,170,255,.35);border-radius:16px;padding:14px;width:min(420px,100%);max-height:100%;display:flex;flex-direction:column;gap:10px;overflow:auto}
+#clip h2{font-size:16px;letter-spacing:.04em}
+#clipvid{width:100%;max-height:50vh;border-radius:10px;background:#000}
+#clipinfo{font-size:12px;opacity:.8;line-height:1.5}
+#clip .row{display:flex;gap:8px;flex-wrap:wrap}
+#clip .row>*{flex:1;text-align:center;white-space:nowrap}
 #fx{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);width:min(540px,calc(100vw - 20px));display:none;grid-template-columns:repeat(4,1fr);gap:6px;z-index:6}
 body.fxopen #fx{display:grid}
 body.fxopen #hint{display:none}
@@ -54,11 +68,27 @@ body.noui #ui{opacity:.4;padding:6px 12px}
   <button id="cam">Camera: on</button>
   <button id="skel">Skeleton: on</button>
   <button id="fxbtn">FX</button>
+  <select id="camsel" title="Choose camera" style="display:none"></select>
+  <button id="haptic" style="display:none">Haptics: on</button>
   <div id="status"></div>
 </div>
 <button id="ui">Hide menu</button>
+<button id="rec" title="Record a clip (R)">&#9679; Rec</button>
 <div id="fx"></div>
 <div id="hint">Pinch (thumb + index) in the air to drop a point. Two points make a string. Pinch near a point to drag it &mdash; closer = higher note, and moving it while the string rings bends the pitch. Strum with open fingers. Drag a point to the &#10005; to delete.</div>
+
+<div id="clip">
+  <div class="card">
+    <h2>YOUR CLIP</h2>
+    <video id="clipvid" controls playsinline loop></video>
+    <div id="clipinfo"></div>
+    <div class="row">
+      <a class="btn" id="clipsave">Save</a>
+      <button id="clipshare" style="display:none">Share</button>
+      <button id="clipdiscard">Discard</button>
+    </div>
+  </div>
+</div>
 
 <div id="start">
   <h1>AIR STRINGS</h1>
@@ -223,7 +253,7 @@ function buildFX(c){
   };
 }
 
-let actx=null, master=null, fx=null;
+let actx=null, master=null, fx=null, recDest=null;
 function initAudio(){
   if(actx) return;
   actx=new (window.AudioContext||window.webkitAudioContext)();
@@ -231,6 +261,7 @@ function initAudio(){
   master=actx.createGain(); master.gain.value=0.9;
   fx=buildFX(actx);
   master.connect(fx.input); fx.output.connect(comp); comp.connect(actx.destination);
+  try{ recDest=actx.createMediaStreamDestination(); comp.connect(recDest); }catch(e){ recDest=null; } // lets the clip recorder hear the app's sound
   applyAllFX();
 }
 function pluck(freq,vel){
@@ -334,6 +365,7 @@ function trigger(s,vel,pt){
   const pc=pitchFor(len);
   s.midi=pc.midi; s.freq=pc.freq;
   s.amp=8+16*vel; s.pulse=1;
+  if(haptics&&canVibe){ try{ navigator.vibrate(8+Math.round(vel*22)); }catch(e){} }
   const v=pluck(pc.freq,vel);
   if(v){ v.len0=len; v.lastLen=len; (s.voices||(s.voices=[])).push(v); if(s.voices.length>8) s.voices.shift(); }
   if(pt) spark(pt.x,pt.y,vel,s);
@@ -360,7 +392,8 @@ function strum(h,now,dt){
 function mapLM(l){
   const vw=video.videoWidth,vh=video.videoHeight;
   const s=Math.max(W/vw,H/vh), ox=(W-vw*s)/2, oy=(H-vh*s)/2;
-  return {x:W-(ox+l.x*vw*s), y:oy+l.y*vh*s};
+  const px=ox+l.x*vw*s;
+  return {x:mirror?W-px:px, y:oy+l.y*vh*s};
 }
 function updateHands(dets,now,dt){
   const used=new Set();
@@ -410,7 +443,7 @@ function drawScene(dt,now){
   ctx.clearRect(0,0,W,H);
   if(showCam&&camOn&&video.videoWidth){
     const vw=video.videoWidth,vh=video.videoHeight,s=Math.max(W/vw,H/vh),ox=(W-vw*s)/2,oy=(H-vh*s)/2;
-    ctx.save();ctx.translate(W,0);ctx.scale(-1,1);ctx.drawImage(video,ox,oy,vw*s,vh*s);ctx.restore();
+    ctx.save();if(mirror){ctx.translate(W,0);ctx.scale(-1,1);}ctx.drawImage(video,ox,oy,vw*s,vh*s);ctx.restore();
     ctx.fillStyle='rgba(4,8,18,.18)';ctx.fillRect(0,0,W,H);
   }else{
     const g=ctx.createRadialGradient(W/2,H/2,50,W/2,H/2,Math.max(W,H)*0.7);
@@ -418,13 +451,16 @@ function drawScene(dt,now){
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
   }
 
-  // trash
+  // trash (hidden during a recording unless you are dragging a point, so clips stay clean)
+  const showTrash=!rec||points.some(p=>p.owner);
   const t=trashPos();
   const hot=points.some(p=>p.owner&&inTrash(p));
+  if(showTrash){
   ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,7);
   ctx.fillStyle=hot?'rgba(255,70,70,.55)':'rgba(10,14,28,.55)';ctx.fill();
   ctx.lineWidth=2;ctx.strokeStyle=hot?'#ff6b6b':'rgba(200,215,255,.5)';ctx.stroke();
   ctx.fillStyle='#fff';ctx.font='700 26px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('\u2715',t.x,t.y+1);
+  }
 
   // strings
   for(const s of strings){
@@ -570,6 +606,153 @@ function updateWah(now){
   wahVis={t,auto};
 }
 
+/* ---------- camera picker ---------- */
+let camStream=null, camId=null, mirror=true;
+const CAMKEY='airstrings.cam';
+function openStream(deviceId){
+  const base={width:{ideal:1280},height:{ideal:720}};
+  return navigator.mediaDevices.getUserMedia({video:deviceId?{...base,deviceId:{exact:deviceId}}:{...base,facingMode:'user'},audio:false});
+}
+async function useCamera(deviceId){
+  if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; } // some virtual cameras can only be opened once
+  let stream;
+  try{ stream=await openStream(deviceId); }
+  catch(e){
+    if(deviceId&&(e.name==='OverconstrainedError'||e.name==='NotFoundError')) stream=await openStream(null); // saved camera is gone
+    else throw e;
+  }
+  camStream=stream;
+  video.srcObject=stream; await video.play();
+  const st=stream.getVideoTracks()[0].getSettings();
+  camId=st.deviceId||deviceId||null;
+  mirror=st.facingMode!=='environment'; // a rear camera is not a mirror
+  camOn=true; lastVideoTime=-1;
+  hands.forEach(onRelease); hands=[];
+}
+const camLabel=()=>{ const t=camStream&&camStream.getVideoTracks()[0]; return t?t.label:''; };
+function loadSavedCam(){
+  try{ const v=localStorage.getItem(CAMKEY); if(!v) return null; if(v[0]!=='{') return {id:v,label:''}; return JSON.parse(v); }catch(e){ return null; }
+}
+async function refreshCams(){
+  try{
+    const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
+    const sel=$('camsel'); sel.innerHTML='';
+    devs.forEach((d,i)=>{
+      const o=document.createElement('option'); o.value=d.deviceId; o.dataset.label=d.label||'';
+      o.textContent=(d.label||('Camera '+(i+1))).replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i,'');
+      sel.appendChild(o);
+    });
+    if(camId&&devs.some(d=>d.deviceId===camId)) sel.value=camId;
+    sel.style.display=devs.length>1?'':'none';
+  }catch(e){}
+}
+$('camsel').onchange=async()=>{
+  const want=$('camsel').value, prev=camId;
+  status('Switching camera…');
+  try{
+    await useCamera(want);
+    try{localStorage.setItem(CAMKEY,JSON.stringify({id:want,label:camLabel()}));}catch(e){}
+    status('Camera ready.',3000);
+  }catch(e){
+    status('Could not open that camera.'+(e.name==='NotReadableError'?' Another app may be using it.':'')+' Going back to the previous one.',7000);
+    try{ await useCamera(prev); }catch(e2){ camOn=false; }
+  }
+  refreshCams();
+};
+if(navigator.mediaDevices) navigator.mediaDevices.ondevicechange=()=>{ if(camOn) refreshCams(); };
+
+/* ---------- haptics (phones) ---------- */
+let haptics=true;
+const canVibe=typeof navigator.vibrate==='function'&&matchMedia('(pointer:coarse)').matches;
+try{ if(localStorage.getItem('airstrings.haptics')==='off') haptics=false; }catch(e){}
+if(canVibe){
+  $('haptic').style.display=''; $('haptic').textContent='Haptics: '+(haptics?'on':'off');
+  $('haptic').onclick=()=>{
+    haptics=!haptics; $('haptic').textContent='Haptics: '+(haptics?'on':'off');
+    try{localStorage.setItem('airstrings.haptics',haptics?'on':'off');}catch(e){}
+    if(haptics){ try{navigator.vibrate(25);}catch(e){} }
+  };
+}
+
+/* ---------- clip recorder ---------- */
+let rec=null, clipURL=null, clipBlob=null, clipName='';
+const MIMES=['video/mp4;codecs=avc1.64001F,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+function pickMime(){
+  if(typeof MediaRecorder==='undefined') return null;
+  for(const m of MIMES){ try{ if(MediaRecorder.isTypeSupported(m)) return m; }catch(e){} }
+  return ''; // let the browser choose
+}
+const fmtTime=sec=>Math.floor(sec/60)+':'+String(Math.floor(sec%60)).padStart(2,'0');
+function startRec(){
+  if(rec) return;
+  const mime=pickMime();
+  if(mime===null||!cv.captureStream){ status('Recording is not supported in this browser.',6000); return; }
+  // record from a copy of the canvas, capped to 1280px, so big or high-DPI screens do not slow the app down
+  const sc=Math.min(1,1280/Math.max(cv.width,cv.height));
+  const w=Math.max(2,Math.round(cv.width*sc/2)*2), h=Math.max(2,Math.round(cv.height*sc/2)*2);
+  const rc=document.createElement('canvas'); rc.width=w; rc.height=h;
+  const rctx=rc.getContext('2d'); rctx.drawImage(cv,0,0,w,h);
+  try{
+    const stream=rc.captureStream(30);
+    if(recDest) recDest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+    const mr=new MediaRecorder(stream,Object.assign({videoBitsPerSecond:5000000,audioBitsPerSecond:128000},mime?{mimeType:mime}:{}));
+    const chunks=[];
+    mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+    const r={mr,stream,ctx:rctx,w,h,t0:performance.now(),timer:null,chunks,mime:mr.mimeType||mime||'video/webm'};
+    mr.onstop=()=>finishRec(r);
+    mr.start(1000);
+    r.timer=setInterval(()=>{
+      const sec=(performance.now()-r.t0)/1000;
+      $('rec').textContent='■ '+fmtTime(sec);
+      if(sec>=120) stopRec(); // keeps clips a shareable size
+    },250);
+    rec=r;
+    $('rec').classList.add('on'); $('rec').textContent='■ 0:00';
+  }catch(e){ status('Could not start recording: '+(e.message||e.name),7000); }
+}
+function stopRec(){
+  if(!rec) return;
+  const r=rec; rec=null;
+  clearInterval(r.timer);
+  $('rec').classList.remove('on'); $('rec').textContent='● Rec';
+  r.secs=(performance.now()-r.t0)/1000;
+  try{ r.mr.stop(); }catch(e){ finishRec(r); }
+}
+function finishRec(r){
+  r.stream.getVideoTracks().forEach(t=>t.stop()); // keep the shared audio tracks running
+  if(!r.chunks.length){ status('The clip came out empty. Try again.',6000); return; }
+  const mime=r.mr.mimeType||r.mime; // the final type is only known once recording has run
+  showClip(new Blob(r.chunks,{type:mime}),mime,r.secs||0);
+}
+function showClip(blob,mime,secs){
+  clipBlob=blob;
+  const ext=/mp4/.test(mime)?'mp4':'webm', d=new Date(), pad=n=>String(n).padStart(2,'0');
+  clipName='air-strings-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())+'.'+ext;
+  if(clipURL) URL.revokeObjectURL(clipURL);
+  clipURL=URL.createObjectURL(blob);
+  $('clipvid').src=clipURL;
+  const a=$('clipsave'); a.href=clipURL; a.download=clipName;
+  const h264=/avc1|h264/i.test(mime);
+  $('clipinfo').textContent=ext.toUpperCase()+(h264?' (H.264)':'')+' \u00B7 '+(blob.size/1048576).toFixed(1)+' MB \u00B7 '+fmtTime(secs)+
+    (h264?'':'. This browser saved it in a format some apps will not accept. If posting fails, try Share, or convert it to a standard H.264 MP4.');
+  let canShare=false;
+  try{ const f=new File([blob],clipName,{type:blob.type}); canShare=!!(navigator.canShare&&navigator.canShare({files:[f]})); }catch(e){}
+  $('clipshare').style.display=canShare?'':'none';
+  $('clip').classList.add('show');
+}
+function closeClip(discard){
+  $('clip').classList.remove('show');
+  $('clipvid').pause();
+  if(discard){ $('clipvid').removeAttribute('src'); $('clipvid').load(); if(clipURL){URL.revokeObjectURL(clipURL);clipURL=null;} clipBlob=null; }
+}
+$('rec').onclick=()=>{ if(rec) stopRec(); else startRec(); };
+$('clipdiscard').onclick=()=>closeClip(true);
+$('clipshare').onclick=async()=>{
+  try{ await navigator.share({files:[new File([clipBlob],clipName,{type:clipBlob.type})],title:'Sentinel Air Strings'}); }
+  catch(e){ if(e&&e.name!=='AbortError') status('Sharing did not work here. Use Save instead.',6000); }
+};
+addEventListener('keydown',e=>{ if(e.key==='r'||e.key==='R') $('rec').click(); });
+
 /* ---------- main loop ---------- */
 let lastFrame=performance.now(), lastVideoTime=-1, lastDet=performance.now();
 function frame(now){
@@ -590,6 +773,7 @@ function frame(now){
   updateBend();
   updateWah(now);
   drawScene(dt,now);
+  if(rec) rec.ctx.drawImage(cv,0,0,rec.w,rec.h);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -608,8 +792,13 @@ $('go').onclick=async()=>{
   status('Starting camera…');
   try{
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw Object.assign(new Error('insecure'),{name:'InsecureContext'});
-    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});
-    video.srcObject=stream; await video.play(); camOn=true;
+    const saved=loadSavedCam();
+    await useCamera(saved&&saved.id);
+    await refreshCams(); // labels are only available once camera access is granted
+    if(saved&&saved.label&&camLabel()!==saved.label){ // the id changed: find the saved camera by its name
+      const o=[...$('camsel').options].find(o=>o.dataset.label===saved.label);
+      if(o){ try{ await useCamera(o.value); }catch(e){ await useCamera(null); } await refreshCams(); }
+    }
   }catch(e){
     const tail=' Mouse mode works meanwhile: click, drag, hover to strum.';
     const msgs={
