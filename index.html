@@ -38,8 +38,27 @@ body.fxopen #hint{display:none}
 .led{width:9px;height:9px;border-radius:50%;background:#3a4258;flex:none}
 .pedal.on .led{background:#7fffb0;box-shadow:0 0 8px #7fffb0}
 .pedal input[type=range]{width:100%;height:18px;accent-color:#9fc0ff}
-#fxbtn.lit{border-color:#7fffb0}
-body.noui #bar,body.noui #hint,body.noui #status,body.noui #fx{display:none}
+#fxbtn.lit,#musicbtn.lit{border-color:#7fffb0}
+#music{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);width:min(540px,calc(100vw - 20px));display:none;flex-direction:column;gap:9px;z-index:6;background:rgba(12,18,36,.88);border:1px solid rgba(140,170,255,.3);border-radius:14px;padding:10px 10px 12px;backdrop-filter:blur(6px)}
+body.musicopen #music{display:flex}
+body.musicopen #hint{display:none}
+#music .mrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#music .mlabel{font-size:11px;font-weight:700;letter-spacing:.1em;opacity:.55;width:100%}
+#music button,#music select{padding:7px 10px;font-size:13px}
+#music button:disabled,#music select:disabled,#music input:disabled{opacity:.4;cursor:default}
+#tempo{width:110px;accent-color:#9fc0ff}
+#beatvol{width:70px;accent-color:#9fc0ff}
+#music .mini{font-size:12px;opacity:.7}
+#bpm{font-size:13px;min-width:4.6em;font-variant-numeric:tabular-nums}
+.dots{display:flex;gap:5px;margin-left:auto;align-items:center}
+.dots i{width:10px;height:10px;border-radius:50%;background:#3a4258}
+.dots i.on{background:#ffd479;box-shadow:0 0 8px #ffd479}
+.dots i.on.one{background:#7fffb0;box-shadow:0 0 8px #7fffb0}
+#loopbtn.armed{border-color:#ffd479;color:#ffd479}
+#loopbtn.recording{background:rgba(190,30,30,.88);border-color:#ff8a8a}
+#loopstat{font-size:12px;opacity:.85;flex-basis:100%;min-height:1.3em}
+#laylist{flex:1;min-width:120px}
+body.noui #bar,body.noui #hint,body.noui #status,body.noui #fx,body.noui #music{display:none}
 body.noui #ui{opacity:.4;padding:6px 12px}
 #status{flex-basis:100%;font-size:12px;opacity:.85;pointer-events:none;text-shadow:0 1px 3px #000}
 #status:empty{display:none}
@@ -68,6 +87,7 @@ body.noui #ui{opacity:.4;padding:6px 12px}
   <button id="cam">Camera: on</button>
   <button id="skel">Skeleton: on</button>
   <button id="fxbtn">FX</button>
+  <button id="musicbtn">Music</button>
   <select id="camsel" title="Choose camera" style="display:none"></select>
   <button id="haptic" style="display:none">Haptics: on</button>
   <div id="status"></div>
@@ -75,6 +95,28 @@ body.noui #ui{opacity:.4;padding:6px 12px}
 <button id="ui">Hide menu</button>
 <button id="rec" title="Record a clip (R)">&#9679; Rec</button>
 <div id="fx"></div>
+<div id="music">
+  <div class="mrow"><span class="mlabel">BEAT</span>
+    <button id="beatbtn">&#9654; Beat</button>
+    <select id="pattern" aria-label="Beat pattern"><option value="rock">Rock</option><option value="hiphop">Hip-hop</option><option value="dance">Dance</option><option value="click">Click</option></select>
+    <input type="range" id="tempo" min="60" max="180" value="90" aria-label="Tempo"><span id="bpm">90 BPM</span>
+    <label class="mini" for="beatvol">Vol</label><input type="range" id="beatvol" min="0" max="100" value="70" aria-label="Beat volume" title="Beat volume">
+    <span class="dots" id="dots"><i></i><i></i><i></i><i></i></span>
+  </div>
+  <div class="mrow"><span class="mlabel">LOOPER</span>
+    <button id="loopbtn">&#9679; Loop</button>
+    <select id="loopbars" aria-label="Loop length"><option value="1">1 bar</option><option value="2" selected>2 bars</option><option value="4">4 bars</option></select>
+    <button id="loopundo" disabled>Undo layer</button>
+    <button id="loopclear" disabled>Clear loop</button>
+    <span id="loopstat">Tap &#9679; Loop and it starts recording on the next bar.</span>
+  </div>
+  <div class="mrow"><span class="mlabel">LAYOUTS</span>
+    <button id="laysave">Save layout</button>
+    <select id="laylist" aria-label="Saved layouts"></select>
+    <button id="layload">Load</button>
+    <button id="laydel">Delete</button>
+  </div>
+</div>
 <div id="hint">Pinch (thumb + index) in the air to drop a point. Two points make a string. Pinch near a point to drag it &mdash; closer = higher note, and moving it while the string rings bends the pitch. Strum with open fingers. Drag a point to the &#10005; to delete.</div>
 
 <div id="clip">
@@ -263,6 +305,7 @@ function initAudio(){
   master.connect(fx.input); fx.output.connect(comp); comp.connect(actx.destination);
   try{ recDest=actx.createMediaStreamDestination(); comp.connect(recDest); }catch(e){ recDest=null; } // lets the clip recorder hear the app's sound
   applyAllFX();
+  initMusic(comp);
 }
 function pluck(freq,vel){
   if(!actx) return null;
@@ -301,8 +344,13 @@ function updateBend(){
 const points=[], strings=[];
 let showCam=true, camOn=false, landmarker=null;
 const hasString=p=>strings.some(s=>s.a===p||s.b===p);
-const fxShown=()=>document.body.classList.contains('fxopen')&&!document.body.classList.contains('noui');
-const trashPos=()=>({x:W-70,y:H-90-(fxShown()?$('fx').offsetHeight+10:0),r:42});
+const openPanel=()=>{
+  const b=document.body.classList;
+  if(b.contains('noui')) return null;
+  return b.contains('fxopen')?$('fx'):b.contains('musicopen')?$('music'):null;
+};
+const fxShown=()=>!!openPanel();
+const trashPos=()=>({x:W-70,y:H-90-(fxShown()?openPanel().offsetHeight+10:0),r:42});
 const inTrash=p=>{const t=trashPos();return Math.hypot(p.x-t.x,p.y-t.y)<t.r+8;};
 function removePoint(p){
   const i=points.indexOf(p); if(i>=0) points.splice(i,1);
@@ -527,7 +575,7 @@ function drawScene(dt,now){
 
   // wah position indicator
   if(wahVis){
-    const x=18,y0=Math.max(H*0.15,150),y1=Math.max(y0+60,Math.min(H*0.85,fxShown()?H-$('fx').offsetHeight-34:H)),ty=y1-wahVis.t*(y1-y0);
+    const x=18,y0=Math.max(H*0.15,150),y1=Math.max(y0+60,Math.min(H*0.85,fxShown()?H-openPanel().offsetHeight-34:H)),ty=y1-wahVis.t*(y1-y0);
     ctx.save();ctx.lineCap='round';ctx.strokeStyle='rgba(255,255,255,.25)';ctx.lineWidth=4;
     ctx.beginPath();ctx.moveTo(x,y0);ctx.lineTo(x,y1);ctx.stroke();
     ctx.fillStyle='#ffd479';ctx.shadowColor='#ffd479';ctx.shadowBlur=12;
@@ -590,7 +638,13 @@ function applyAllFX(){ for(const p of PEDALS) applyFX(p.id); }
     paint(); el.append(b,r); box.appendChild(el);
   }
 })();
-$('fxbtn').onclick=()=>{const o=document.body.classList.toggle('fxopen'); $('fxbtn').classList.toggle('lit',o);};
+function setPanel(name){
+  const b=document.body.classList;
+  b.toggle('fxopen',name==='fx'); b.toggle('musicopen',name==='music');
+  $('fxbtn').classList.toggle('lit',name==='fx'); $('musicbtn').classList.toggle('lit',name==='music');
+}
+$('fxbtn').onclick=()=>setPanel(document.body.classList.contains('fxopen')?null:'fx');
+$('musicbtn').onclick=()=>setPanel(document.body.classList.contains('musicopen')?null:'music');
 addEventListener('keydown',e=>{if(e.key==='f'||e.key==='F')$('fxbtn').click();});
 
 // air wah: with two hands tracked, the height of the left-most hand sweeps the filter; otherwise it sweeps by itself
@@ -607,14 +661,32 @@ function updateWah(now){
 }
 
 /* ---------- camera picker ---------- */
-let camStream=null, camId=null, mirror=true;
+let camStream=null, camId=null, mirror=true, camAdvice='';
 const CAMKEY='airstrings.cam';
-function openStream(deviceId){
-  const base={width:{ideal:1280},height:{ideal:720}};
+// The first request is the normal one every phone and webcam gets. The others are only tried if a camera
+// connects but sends a solid green picture, which some virtual webcam drivers (like GoPro's) do at a size they do not support.
+const RES_TRIES=[{width:{ideal:1280},height:{ideal:720}},{},{width:{ideal:1920},height:{ideal:1080}},{width:{ideal:640},height:{ideal:480}}];
+function openStream(deviceId,res){
+  const base=res||RES_TRIES[0];
   return navigator.mediaDevices.getUserMedia({video:deviceId?{...base,deviceId:{exact:deviceId}}:{...base,facingMode:'user'},audio:false});
+}
+async function pictureIsBlankGreen(){ // true only if every sample is flat, solid green: a working camera's picture is never this uniform
+  const c=document.createElement('canvas'); c.width=32; c.height=18;
+  const x=c.getContext('2d',{willReadFrequently:true});
+  for(let k=0;k<3;k++){
+    await new Promise(r=>setTimeout(r,250));
+    if(!video.videoWidth) return false;
+    try{ x.drawImage(video,0,0,32,18); }catch(e){ return false; }
+    const d=x.getImageData(0,0,32,18).data; let r=0,g=0,b=0,g2=0; const n=d.length/4;
+    for(let i=0;i<d.length;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; g2+=d[i+1]*d[i+1]; }
+    r/=n; g/=n; b/=n; const sd=Math.sqrt(Math.max(0,g2/n-g*g));
+    if(!(g>90&&r<30&&b<30&&sd<8)) return false;
+  }
+  return true;
 }
 async function useCamera(deviceId){
   if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; } // some virtual cameras can only be opened once
+  camAdvice='';
   let stream;
   try{ stream=await openStream(deviceId); }
   catch(e){
@@ -623,6 +695,15 @@ async function useCamera(deviceId){
   }
   camStream=stream;
   video.srcObject=stream; await video.play();
+  for(let i=1;i<RES_TRIES.length&&await pictureIsBlankGreen();i++){ // only for cameras that send a blank green picture
+    status('This camera is sending a blank green picture. Trying another size ('+i+' of '+(RES_TRIES.length-1)+')…');
+    const id=stream.getVideoTracks()[0].getSettings().deviceId||deviceId;
+    stream.getTracks().forEach(t=>t.stop());
+    try{ stream=await openStream(id,RES_TRIES[i]); }catch(e){ stream=await openStream(id); }
+    camStream=stream; video.srcObject=stream; await video.play();
+    camAdvice=(i===RES_TRIES.length-1&&await pictureIsBlankGreen())?'This camera still sends a blank green picture. In its own app, set it to 1080p and restart it, then pick it again here.':'';
+    status(camAdvice,camAdvice?15000:0);
+  }
   const st=stream.getVideoTracks()[0].getSettings();
   camId=st.deviceId||deviceId||null;
   mirror=st.facingMode!=='environment'; // a rear camera is not a mirror
@@ -753,6 +834,255 @@ $('clipshare').onclick=async()=>{
 };
 addEventListener('keydown',e=>{ if(e.key==='r'||e.key==='R') $('rec').click(); });
 
+/* ---------- shared clock, backing beat, looper, layouts ---------- */
+// One clock drives the beat and the looper, so loops always land on the beat.
+// Everything is scheduled on the audio clock, not the screen, so timing stays tight even if hand tracking is busy.
+const BEATS={ // 16 steps per bar (sixteenth notes)
+  rock:  {k:[0,8,10], s:[4,12], h:[0,2,4,6,8,10,12,14]},
+  hiphop:{k:[0,7,10], s:[4,12], h:[0,2,4,6,8,10,12,14], swing:0.14},
+  dance: {k:[0,4,8,12], s:[4,12], h:[2,6,10,14], open:true},
+  click: {c:true}
+};
+let beatBus=null, loopBus=null, noiseBuf=null, capNode=null, capReady=null, beatOn=false;
+const T={running:false,bpm:90,start:0,step:0,next:0,timer:null};
+const stepDur=()=>60/T.bpm/4, barDur=()=>60/T.bpm*4;
+const L={layers:[],len:0,origin:null,pending:null,seq:0};
+const MUSKEY='airstrings.music';
+
+function initMusic(comp){
+  beatBus=actx.createGain(); beatBus.gain.value=($('beatvol').value/100)*0.9; beatBus.connect(comp);
+  loopBus=actx.createGain(); loopBus.connect(comp);
+  noiseBuf=actx.createBuffer(1,actx.sampleRate,actx.sampleRate);
+  const nd=noiseBuf.getChannelData(0); for(let i=0;i<nd.length;i++) nd[i]=Math.random()*2-1;
+  // the looper listens to the strings after the effects (not the beat, not earlier loop layers)
+  if(actx.audioWorklet&&typeof AudioWorkletNode!=='undefined'){
+    const code=`class Cap extends AudioWorkletProcessor{
+      constructor(){super();this.r=null;this.port.onmessage=e=>{const d=e.data;
+        if(d.cmd==='rec')this.r={id:d.id,start:d.start,len:d.len,L:new Float32Array(d.len),R:new Float32Array(d.len)};
+        else if(d.cmd==='cancel')this.r=null;};}
+      process(inputs){
+        const r=this.r; if(!r) return true;
+        const inp=inputs[0], f0=currentFrame;
+        if(inp&&inp.length){const a=inp[0],b=inp[1]||inp[0];
+          for(let i=0;i<a.length;i++){const k=f0+i-r.start; if(k>=0&&k<r.len){r.L[k]=a[i];r.R[k]=b[i];}}}
+        if(f0+128>=r.start+r.len){this.port.postMessage({id:r.id,L:r.L,R:r.R},[r.L.buffer,r.R.buffer]);this.r=null;}
+        return true;}
+    } registerProcessor('air-cap',Cap);`;
+    const url=URL.createObjectURL(new Blob([code],{type:'application/javascript'}));
+    capReady=actx.audioWorklet.addModule(url).then(()=>{
+      capNode=new AudioWorkletNode(actx,'air-cap',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1],channelCount:2,channelCountMode:'explicit'});
+      fx.output.connect(capNode);
+      const z=actx.createGain(); z.gain.value=0; capNode.connect(z); z.connect(actx.destination); // keeps it running
+      capNode.port.onmessage=onCapture;
+    }).catch(()=>{capNode=null;});
+  }
+}
+
+// ---- drums (all synthesized) ----
+function drum(type,t,acc){
+  const g=actx.createGain(); g.connect(beatBus);
+  if(type==='k'){ // kick: a sine that drops in pitch
+    const o=actx.createOscillator(); o.frequency.setValueAtTime(130,t); o.frequency.exponentialRampToValueAtTime(42,t+0.13);
+    g.gain.setValueAtTime(1,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.38); o.connect(g); o.start(t); o.stop(t+0.4);
+  }else if(type==='s'){ // snare: filtered noise plus a short tone
+    const n=actx.createBufferSource(), hp=actx.createBiquadFilter(); n.buffer=noiseBuf; hp.type='highpass'; hp.frequency.value=1400;
+    n.connect(hp); hp.connect(g); g.gain.setValueAtTime(0.55,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.2); n.start(t,Math.random()*0.5); n.stop(t+0.22);
+    const o=actx.createOscillator(), og=actx.createGain(); o.type='triangle'; o.frequency.value=195;
+    og.gain.setValueAtTime(0.45,t); og.gain.exponentialRampToValueAtTime(0.001,t+0.1); o.connect(og); og.connect(beatBus); o.start(t); o.stop(t+0.12);
+  }else if(type==='h'||type==='o'){ // hi-hat (closed or open): bright noise
+    const n=actx.createBufferSource(), hp=actx.createBiquadFilter(); n.buffer=noiseBuf; hp.type='highpass'; hp.frequency.value=7500;
+    const len=type==='o'?0.2:0.05; n.connect(hp); hp.connect(g);
+    g.gain.setValueAtTime(acc?0.3:0.18,t); g.gain.exponentialRampToValueAtTime(0.001,t+len); n.start(t,Math.random()*0.5); n.stop(t+len+0.02);
+  }else{ // metronome click, higher on beat one
+    const o=actx.createOscillator(); o.type='square'; o.frequency.value=acc?1760:1320;
+    g.gain.setValueAtTime(acc?0.28:0.16,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.04); o.connect(g); o.start(t); o.stop(t+0.05);
+  }
+}
+function playStep(i,t){
+  const p=BEATS[$('pattern').value]||BEATS.rock, st=i%16;
+  if(p.c){ if(st%4===0) drum('c',t,st===0); return; }
+  if(p.k.includes(st)) drum('k',t);
+  if(p.s.includes(st)) drum('s',t);
+  if(p.h.includes(st)) drum(p.open?'o':'h',t,st%4===0);
+}
+function schedule(){
+  if(!T.running) return;
+  const ahead=actx.currentTime+0.15;
+  while(T.next<ahead){
+    const p=BEATS[$('pattern').value]||{};
+    const t=T.next+((p.swing&&T.step%2===1)?stepDur()*p.swing*2:0);
+    if(beatOn&&t>=actx.currentTime-0.01) playStep(T.step,t);
+    T.step++; T.next=T.start+T.step*stepDur();
+  }
+}
+function startClock(){
+  if(T.running) return;
+  if(actx.state==='suspended') actx.resume();
+  T.start=actx.currentTime+0.1; T.step=0; T.next=T.start; T.running=true;
+  T.timer=setInterval(schedule,25); schedule();
+}
+function stopClock(){ T.running=false; clearInterval(T.timer); T.timer=null; }
+function setBeat(on){
+  if(!actx) return;
+  beatOn=on;
+  if(on) startClock();
+  else if(!L.layers.length&&!L.pending) stopClock(); // with a loop going, the clock keeps running silently so overdubs stay in time
+  $('beatbtn').innerHTML=on?'&#9632; Beat':'&#9654; Beat';
+}
+function setTempo(bpm){
+  bpm=Math.max(60,Math.min(180,Math.round(bpm)));
+  if(T.running){ // keep the current position in the bar when the tempo changes
+    const pos=(actx.currentTime-T.start)/stepDur();
+    T.bpm=bpm; T.start=actx.currentTime-pos*stepDur(); T.next=T.start+T.step*stepDur();
+  }else T.bpm=bpm;
+  $('tempo').value=bpm; $('bpm').textContent=bpm+' BPM';
+}
+const nextBar=t=>T.start+Math.ceil((t-T.start)/barDur()-1e-6)*barDur();
+
+// ---- looper ----
+async function loopPress(){
+  if(!actx) return;
+  if(L.pending){ // tapping again while armed or recording cancels this take
+    if(capNode) capNode.port.postMessage({cmd:'cancel'});
+    L.pending=null; if(!beatOn&&!L.layers.length) stopClock(); return;
+  }
+  if(capReady) await capReady;
+  if(!capNode){ status('The looper needs a newer browser.',6000); return; }
+  if(L.layers.length>=6){ status('Six layers is the limit. Undo a layer to add another.',5000); return; }
+  let countIn=false;
+  if(!T.running){ setBeat(true); countIn=true; } // starting from silence: the beat comes in and you get one bar to get ready
+  const now=actx.currentTime;
+  let start;
+  if(!L.layers.length){
+    L.len=+$('loopbars').value*barDur();
+    start=nextBar(now+0.06); if(countIn) start+=barDur();
+  }else{ // overdub: record one full pass of the loop, starting where the loop starts
+    start=L.origin+Math.ceil((now+0.06-L.origin)/L.len)*L.len;
+  }
+  const sr=actx.sampleRate;
+  L.pending={id:++L.seq,start,len:L.len,first:!L.layers.length};
+  capNode.port.postMessage({cmd:'rec',id:L.pending.id,start:Math.round(start*sr),len:Math.round(L.len*sr)});
+}
+function onCapture(e){
+  const pd=L.pending; if(!pd||e.data.id!==pd.id) return; // ignore a take that was cancelled
+  L.pending=null;
+  const n=e.data.L.length, sr=actx.sampleRate, buf=actx.createBuffer(2,n,sr);
+  const fade=Math.min(Math.floor(sr*0.004),n>>2); // tiny fades so the loop point does not click
+  for(const [c,d] of [[0,e.data.L],[1,e.data.R]]){
+    for(let i=0;i<fade;i++){const g=i/fade; d[i]*=g; d[n-1-i]*=g;}
+    buf.copyToChannel(d,c);
+  }
+  if(pd.first) L.origin=pd.start;
+  const end=pd.start+pd.len, now=actx.currentTime, when=Math.max(end,now+0.02);
+  const src=actx.createBufferSource(), g=actx.createGain(), off=(when-end)%pd.len;
+  src.buffer=buf; src.loop=true; src.connect(g); g.connect(loopBus);
+  src.start(when,off); // start in step with the loop, even if this message arrived a little late
+  L.layers.push({src,g,buf,when,off});
+}
+function undoLayer(){
+  const l=L.layers.pop(); if(!l) return;
+  try{l.src.stop();}catch(e){} l.g.disconnect();
+  if(!L.layers.length){ L.origin=null; if(!beatOn&&!L.pending) stopClock(); }
+}
+function clearLoop(){
+  if(L.pending){ if(capNode) capNode.port.postMessage({cmd:'cancel'}); L.pending=null; }
+  while(L.layers.length) undoLayer();
+  L.origin=null; if(!beatOn) stopClock();
+}
+
+// ---- panel wiring and live display ----
+function saveMusic(){ try{localStorage.setItem(MUSKEY,JSON.stringify({bpm:T.bpm,pattern:$('pattern').value,vol:+$('beatvol').value,bars:$('loopbars').value}));}catch(e){} }
+(function loadMusic(){
+  try{
+    const m=JSON.parse(localStorage.getItem(MUSKEY)||'null'); if(!m) return;
+    if(BEATS[m.pattern]) $('pattern').value=m.pattern;
+    if(typeof m.vol==='number') $('beatvol').value=Math.max(0,Math.min(100,m.vol));
+    if(['1','2','4'].includes(m.bars)) $('loopbars').value=m.bars;
+    if(typeof m.bpm==='number') setTempo(m.bpm);
+  }catch(e){}
+})();
+$('beatbtn').onclick=()=>setBeat(!beatOn);
+$('tempo').oninput=()=>{setTempo(+$('tempo').value); saveMusic();};
+$('beatvol').oninput=()=>{ if(beatBus) beatBus.gain.setTargetAtTime(($('beatvol').value/100)*0.9,actx.currentTime,0.02); saveMusic(); };
+$('pattern').onchange=saveMusic; $('loopbars').onchange=saveMusic;
+$('loopbtn').onclick=loopPress; $('loopundo').onclick=undoLayer; $('loopclear').onclick=clearLoop;
+addEventListener('keydown',e=>{
+  if(e.target&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+  const k=e.key.toLowerCase();
+  if(k==='b') $('beatbtn').click(); else if(k==='l') $('loopbtn').click(); else if(k==='m') $('musicbtn').click();
+});
+let lastMusicUI='';
+function updateMusicUI(){
+  if(!actx) return;
+  const now=actx.currentTime-(actx.outputLatency||0); // show what you are hearing right now
+  let beat=-1;
+  if(T.running&&now>=T.start) beat=Math.floor((now-T.start)/(barDur()/4))%4;
+  let msg, cls='';
+  const lp=L.pending, nl=L.layers.length;
+  if(lp&&actx.currentTime<lp.start){
+    const beatsLeft=Math.ceil((lp.start-actx.currentTime)/(barDur()/4));
+    msg=(lp.first?'Get ready: recording starts in ':'Get ready to add a layer: starts in ')+beatsLeft+(beatsLeft===1?' beat':' beats'); cls='armed';
+  }else if(lp){
+    const barsTotal=Math.round(lp.len/barDur()), bar=Math.min(barsTotal,Math.floor((actx.currentTime-lp.start)/barDur())+1);
+    msg='Recording '+(lp.first?'your loop':'layer '+(nl+1))+' · bar '+bar+' of '+barsTotal+' (tap ● Loop to cancel)'; cls='recording';
+  }else if(nl){
+    const barsTotal=Math.round(L.len/barDur()), bar=Math.floor(((actx.currentTime-L.origin)%L.len+L.len)%L.len/barDur())+1;
+    msg='Looping · '+nl+(nl===1?' layer':' layers')+' · bar '+bar+' of '+barsTotal+'. Tap ● Loop to add a layer.';
+  }else msg='Tap ● Loop and it starts recording on the next bar.';
+  const busy=nl>0||!!lp;
+  const key=beat+'|'+msg+'|'+cls+'|'+busy+'|'+nl;
+  if(key===lastMusicUI) return; lastMusicUI=key;
+  [...$('dots').children].forEach((d,i)=>{d.classList.toggle('on',i===beat); d.classList.toggle('one',i===0);});
+  $('loopstat').textContent=msg;
+  const lb=$('loopbtn'); lb.classList.toggle('armed',cls==='armed'); lb.classList.toggle('recording',cls==='recording');
+  lb.innerHTML=lp?'&#9632; Cancel':'&#9679; Loop';
+  $('loopundo').disabled=!nl; $('loopclear').disabled=!busy;
+  $('tempo').disabled=busy; $('loopbars').disabled=busy; // a loop is fixed to the tempo it was recorded at
+}
+
+// ---- layouts ----
+const LAYKEY='airstrings.layouts';
+function getLayouts(){ try{ const v=JSON.parse(localStorage.getItem(LAYKEY)||'[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; } }
+function putLayouts(a){ try{ localStorage.setItem(LAYKEY,JSON.stringify(a)); return true; }catch(e){ return false; } }
+function paintLayouts(pick){
+  const a=getLayouts(), sel=$('laylist'); sel.innerHTML='';
+  if(!a.length){ const o=document.createElement('option'); o.textContent='No saved layouts yet'; sel.appendChild(o); }
+  sel.disabled=!a.length;
+  a.forEach((l,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=l.name+' ('+l.strs.length+(l.strs.length===1?' string)':' strings)'); sel.appendChild(o); });
+  if(pick!=null&&a[pick]) sel.value=pick;
+  $('layload').disabled=$('laydel').disabled=!a.length;
+}
+$('laysave').onclick=()=>{
+  if(!strings.length){ status('Make at least one string first, then save.',4000); return; }
+  const a=getLayouts();
+  let name='Layout '+(a.length+1);
+  try{ const v=prompt('Name this layout:',name); if(v===null) return; if(v.trim()) name=v.trim().slice(0,40); }catch(e){}
+  const idx=new Map(points.map((p,i)=>[p,i]));
+  a.push({name,scale:scaleSel.value,key:keySel.value,
+    pts:points.map(p=>[+(p.x/W).toFixed(4),+(p.y/H).toFixed(4)]),
+    strs:strings.map(st=>[idx.get(st.a),idx.get(st.b)]).filter(([i,j])=>i!=null&&j!=null),saved:Date.now()});
+  if(a.length>30) a.shift();
+  if(putLayouts(a)){ paintLayouts(a.length-1); status('Saved "'+name+'".',3000); }
+  else status('Could not save on this device (storage is blocked or full).',6000);
+};
+$('layload').onclick=()=>{
+  const l=getLayouts()[+$('laylist').value]; if(!l) return;
+  points.length=0; strings.length=0; hands.forEach(h=>h.grabbed=null); mouse.grabbed=null;
+  const pts=l.pts.map(([x,y])=>({x:Math.min(W-4,Math.max(4,x*W)),y:Math.min(H-4,Math.max(4,y*H)),owner:null}));
+  points.push(...pts);
+  for(const [i,j] of l.strs) if(pts[i]&&pts[j]) strings.push({a:pts[i],b:pts[j],amp:0,phase:0,last:0,midi:57,freq:220});
+  if(SCALES[l.scale]||l.scale==='free') scaleSel.value=l.scale;
+  if(l.key!=null) keySel.value=l.key;
+  status('Loaded "'+l.name+'".',3000);
+};
+$('laydel').onclick=()=>{
+  const a=getLayouts(), i=+$('laylist').value; if(!a[i]) return;
+  let ok=true; try{ ok=confirm('Delete "'+a[i].name+'"?'); }catch(e){}
+  if(!ok) return;
+  a.splice(i,1); putLayouts(a); paintLayouts(Math.min(i,a.length-1));
+};
+paintLayouts();
+
 /* ---------- main loop ---------- */
 let lastFrame=performance.now(), lastVideoTime=-1, lastDet=performance.now();
 function frame(now){
@@ -772,6 +1102,7 @@ function frame(now){
   }
   updateBend();
   updateWah(now);
+  updateMusicUI();
   drawScene(dt,now);
   if(rec) rec.ctx.drawImage(cv,0,0,rec.w,rec.h);
   requestAnimationFrame(frame);
@@ -810,7 +1141,7 @@ $('go').onclick=async()=>{
     noCamera(msgs[e.name]||('Camera unavailable.'+tail));
     return;
   }
-  status('Loading hand tracking…');
+  status(camAdvice||'Loading hand tracking…',camAdvice?15000:0);
   try{
     const mp=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm');
     const fileset=await mp.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
@@ -818,8 +1149,8 @@ $('go').onclick=async()=>{
     const opts=d=>({baseOptions:{modelAssetPath,delegate:d},runningMode:'VIDEO',numHands:4,minHandDetectionConfidence:.5,minHandPresenceConfidence:.5,minTrackingConfidence:.5});
     try{landmarker=await mp.HandLandmarker.createFromOptions(fileset,opts('GPU'));}
     catch(e){landmarker=await mp.HandLandmarker.createFromOptions(fileset,opts('CPU'));}
-    status('Hands ready — pinch to place a point.');
-    setTimeout(()=>status(''),4000);
+    if(camAdvice) status(camAdvice,15000); // keep the camera tip on screen
+    else{ status('Hands ready — pinch to place a point.'); setTimeout(()=>status(''),4000); }
     setTimeout(()=>{$('hint').style.opacity=.35;},15000);
   }catch(e){
     status('Hand tracking failed to load. Check your connection and reload. Mouse mode still works.',15000);
