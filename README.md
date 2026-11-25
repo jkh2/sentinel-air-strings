@@ -56,8 +56,11 @@ The camera image is processed on your device. Nothing from your video is uploade
 | **Scale** | Minor pentatonic, major pentatonic, major, blues, or free. The first four snap strings to notes in the scale; free lets pitch slide continuously. |
 | **Key** | Sets the root note of the scale. |
 | **Camera** | Turns the camera image on or off. The instrument keeps working over a plain background. |
+| **Camera picker** | Appears when you have more than one camera (a webcam, DroidCam, a GoPro, a phone's front and back cameras). Your choice is remembered. A rear camera is shown unmirrored. |
 | **Skeleton** | Shows or hides the green hand skeleton overlay. |
 | **FX** (or `F`) | Opens the pedalboard (see below). |
+| **● Rec** (or `R`) | Records a clip of your playing with its sound (see below). Stays on screen even with the menu hidden. |
+| **Haptics** | Phones only: a short buzz on each pluck. Works on many Android phones; iPhones do not allow it. |
 | **Hide menu** (or `H`) | Hides all the buttons and the instruction box for a clean, full-screen view. Tap the small ☰ in the top-right corner to bring them back. |
 
 ### Effects pedalboard
@@ -76,6 +79,15 @@ Tap **FX** to open eight pedals. Tap a pedal's name to switch it on (its light t
 | **Octave** | Adds a quieter copy of each pluck one octave up. | Mix |
 
 The pedals are level-matched so switching one on does not suddenly make everything louder. Opening the pedalboard hides the instruction box and moves the ✕ up so nothing is covered, and **Hide menu** hides the pedalboard too (your effects stay on).
+
+### Recording a clip
+
+Tap **● Rec** to start. The button turns red and shows a timer. Tap it again to stop (clips stop on their own at 2 minutes). A card then shows your clip with **Save**, **Share** (on phones that support sharing files), and **Discard**.
+
+- The clip records what is drawn on the instrument: your camera view, the strings, the sparks, and the app's sound with your effects. The buttons, menus, and pedalboard are not in the video, and the ✕ only appears while you are dragging a point.
+- Your microphone is not recorded.
+- The format depends on your browser. Most current browsers make an MP4. The card says **MP4 (H.264)** when it is the widely accepted kind. If it does not, some apps may refuse the file; try Share, or convert it to an H.264 MP4.
+- For the cleanest clip, tap **Hide menu** and turn **Skeleton** off before recording.
 
 ### No camera? Use a mouse
 
