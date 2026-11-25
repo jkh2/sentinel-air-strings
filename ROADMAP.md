@@ -15,10 +15,15 @@ Plan drafted Nov 23, 2026. Updated Nov 24, 2026. Order is a suggestion, not a pr
 - Pitch bend: move a point while its string rings and the note slides with it (Nov 24)
 - Effects pedalboard with drive, wah, tremolo, chorus, flanger, echo, reverb, and octave (Nov 24)
 - Fixed a tuning error that made notes sharp, up to about half a semitone on high notes (Nov 24)
+- Clip recorder: records the instrument view and its sound, with Save, Share, and Discard (Nov 24)
+- Camera picker, remembered between visits, with rear cameras shown unmirrored (Nov 24)
+- Haptics on phones that support vibration (Nov 24)
+- Tested on a PC with a phone as the webcam through DroidCam: worked well, and a bigger screen helps a lot
 
 ## Before anything new
 
-- [ ] Test with a GoPro / webcam on a computer and note what happens
+- [x] Test with a webcam on a computer (phone through DroidCam, Nov 24)
+- [ ] Test with the GoPro, using the new camera picker
 - [ ] Note any missed strums, stray points, or pinch problems
 - [ ] Take a new screenshot that shows real hand tracking, with the skeleton visible
 
@@ -27,8 +32,8 @@ Plan drafted Nov 23, 2026. Updated Nov 24, 2026. Order is a suggestion, not a pr
 Small changes that make the instrument nicer to use right away.
 
 1. ~~**Pitch bend.**~~ Done Nov 24. Dragging a point while its string rings slides the note.
-2. **Camera picker.** A dropdown to choose between cameras (GoPro, webcam, phone front and back). Needed for the GoPro test.
-3. **Vibration on pluck.** A short buzz on phones that support it (many Android phones; iPhones do not allow it).
+2. ~~**Camera picker.**~~ Done Nov 24.
+3. ~~**Vibration on pluck.**~~ Done Nov 24 (Haptics button, phones only).
 4. **Phone sizing.** Larger points and pinch targets on small screens, since the phone view felt cramped.
 
 ## Phase 2: Making music
@@ -61,9 +66,10 @@ These work best when built together, because the looper and backing beat depend 
 
 ## Phase 4: Sharing
 
-11. **Record a clip.** One button records the screen and sound together and saves a video to post.
-    - Likely to be the biggest help for getting noticed, so consider moving it earlier.
-    - Output is usually `.webm` on Android and desktop Chrome. Some apps and sites will not accept it, so test posting before relying on it.
+11. ~~**Record a clip.**~~ Done Nov 24. Still to check on real devices:
+    - Which format your phone and PC actually produce (the clip card says whether it is H.264)
+    - Whether the apps you post to accept it
+    - Possible next step: an optional microphone track, so you can talk or sing over your playing
 
 ## Ideas for later
 
